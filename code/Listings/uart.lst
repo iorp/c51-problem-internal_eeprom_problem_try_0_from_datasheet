@@ -1,0 +1,236 @@
+C51 COMPILER V9.52.0.0   UART                                                              03/11/2024 03:22:54 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN .\Objects\uart.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE uart.c BROWSE INCDIR(C:\Keil\C51\H) DEBUG OBJECTEXTEND PRINT(.\Listings\uar
+                    -t.lst) TABS(2) OBJECT(.\Objects\uart.obj)
+
+line level    source
+
+   1           
+   2          #include "uart.h"
+   3          
+   4           
+   5          void UART_init(unsigned long v_baudRate_u32)
+   6          {    
+   7   1          TMOD |= 0x20; //Timer1 in Mode2.
+   8   1          SCON=0x50;    // Asynchronous mode, 8-bit data and 1-stop bit
+   9   1          TR1=1;        //Turn ON the timer for Baud rate generation
+  10   1          UART_setBaudRate(v_baudRate_u32);  
+  11   1      } 
+  12           
+  13          void UART_setBaudRate(unsigned long v_baudRate_u32)
+  14          {
+  15   1          char RegValue;
+  16   1           RegValue = UART_getBaudRate(v_baudRate_u32);
+  17   1      
+  18   1          TH1 = RegValue; 
+  19   1      }
+  20          
+  21          
+  22          
+  23          
+  24          void UART_txByte(unsigned char byte) {
+  25   1         
+  26   1              SBUF = byte;  // Send byte
+  27   1              while (!TI);      // Wait for transmit complete
+  28   1              TI = 0;           // Clear transmit interrupt flag
+  29   1       
+  30   1      }
+  31          
+  32          void UART_Listen(){
+  33   1       unsigned char receivedData;
+  34   1      // COMMAND LOGIC GOES HERE 
+  35   1          if (RI) {
+  36   2              receivedData = SBUF;  // Read the received character
+  37   2              RI = 0;               // Clear the receive interrupt flag
+  38   2      
+  39   2              
+  40   2              // Process the received data (mirror it back)
+  41   2              SBUF = receivedData;  // Send the character back
+  42   2              while (!TI);          // Wait for the transmit to complete
+  43   2              TI = 0;               // Clear the transmit interrupt flag
+  44   2          }
+  45   1      }
+  46            
+  47            #if (UART_ENABLE==1 && UART_PRINT_ENABLE==1  )  
+  48          void UART_printStr(const char *string) {
+  49   1         
+  50   1          while (*string != '\0') {
+  51   2              UART_txByte(*string) ;
+  52   2              string++;        // Move to the next character
+  53   2             
+  54   2          }
+C51 COMPILER V9.52.0.0   UART                                                              03/11/2024 03:22:54 PAGE 2   
+
+  55   1        
+  56   1      }
+  57          
+  58          void UART_printDec(unsigned long value) {
+  59   1        
+  60   1          unsigned char str[11];
+  61   1          unsigned char index;
+  62   1      
+  63   1          // Null-terminate the string
+  64   1          str[sizeof(str) - 1] = '\0';
+  65   1      
+  66   1          // Start from the end of the buffer
+  67   1          index = sizeof(str) - 2;
+  68   1      
+  69   1          // Handle special case for value == 0
+  70   1          if (value == 0) {
+  71   2              str[index--] = '0';
+  72   2          } else {
+  73   2              // Convert each digit to char and store in reverse order
+  74   2              while (value > 0 && index >= 0) {
+  75   3                  str[index--] = '0' + (value % 10);
+  76   3                  value /= 10;
+  77   3              }
+  78   2          }
+  79   1      
+  80   1          // Move the string to the beginning of the buffer if necessary
+  81   1          if (index >= 0) {
+  82   2              unsigned char i;
+  83   2              for (i = 0; i < sizeof(str) - index - 1; ++i) {
+  84   3                  str[i] = str[index + 1 + i];
+  85   3              }
+  86   2          }
+  87   1      
+  88   1          // Transmit the string using UART_printStr
+  89   1          UART_printStr(str);
+  90   1       
+  91   1      }
+  92          
+  93          void UART_printHex(unsigned long value, unsigned char byteCount) {
+  94   1        
+  95   1          unsigned char str[5];  // Assuming a 16-bit value, 4 characters (plus null terminator)
+  96   1          unsigned char index;
+  97   1          unsigned char i;
+  98   1          // Null-terminate the string
+  99   1          str[sizeof(str) - 1] = '\0';
+ 100   1      
+ 101   1          // Start from the end of the buffer
+ 102   1          index = sizeof(str) - 2;
+ 103   1      
+ 104   1          // Convert each nibble to char and store in reverse order
+ 105   1          for (i = 0; i < byteCount * 2 && index >= 0; ++i) {
+ 106   2              unsigned char nibble = (value >> (4 * i)) & 0x0F;
+ 107   2              str[index--] = (nibble < 10) ? ('0' + nibble) : ('A' + nibble - 10);
+ 108   2          }
+ 109   1      
+ 110   1          // Move the string to the beginning of the buffer if necessary
+ 111   1          if (index >= 0) {
+ 112   2              unsigned char i;
+ 113   2              for (i = 0; i < sizeof(str) - index - 1; ++i) {
+ 114   3                  str[i] = str[index + 1 + i];
+ 115   3              }
+ 116   2          }
+C51 COMPILER V9.52.0.0   UART                                                              03/11/2024 03:22:54 PAGE 3   
+
+ 117   1      
+ 118   1          // Transmit the string using UART_printStr
+ 119   1          UART_printStr(str);
+ 120   1          
+ 121   1       
+ 122   1      
+ 123   1      }
+ 124          
+ 125          void UART_printf(const char *format, unsigned int arg1) {
+ 126   1        
+ 127   1          char c;
+ 128   1          unsigned int value = 0;
+ 129   1          unsigned char byteCount = 2;  // Default byte count for %x specifier
+ 130   1      
+ 131   1          while ((c = *format++)) {
+ 132   2              if (c == '%') {
+ 133   3                  c = *format++;
+ 134   3                  if (c == 'd') {
+ 135   4                      value = arg1;
+ 136   4                      UART_printDec(value);
+ 137   4                  } else if (c == 'x') {
+ 138   4                      // Parse the width specifier for %x
+ 139   4                      if (*format >= '1' && *format <= '9') {
+ 140   5                          byteCount = *format - '0';
+ 141   5                          while (*(format + 1) >= '0' && *(format + 1) <= '9') {
+ 142   6                              byteCount = byteCount * 10 + (*(++format) - '0');
+ 143   6                          }
+ 144   5                      }
+ 145   4                      UART_printHex(arg1, byteCount);
+ 146   4                  }   else {
+ 147   4                      // Unknown specifier, just print it
+ 148   4                      UART_txByte('%');
+ 149   4                      UART_txByte(c);
+ 150   4                  }
+ 151   3              } else {
+ 152   3                  // Regular character, just print it
+ 153   3                  UART_txByte(c);
+ 154   3              }
+ 155   2          }
+ 156   1       
+ 157   1      }
+ 158          
+ 159          
+ 160          
+ 161          
+ 162          #endif
+ 163          
+ 164          
+ 165          
+ 166          
+ 167          
+ 168          
+ 169          
+ 170          
+ 171          
+ 172          
+ 173          
+ 174          
+ 175          
+ 176          
+ 177          
+ 178          
+C51 COMPILER V9.52.0.0   UART                                                              03/11/2024 03:22:54 PAGE 4   
+
+ 179          // working but not used 
+ 180          // #if (Enable_UART_TxBytes==1  )
+ 181          // void UART_txBytes(const unsigned char *bytes, unsigned int length) {
+ 182          //     unsigned int i =0;
+ 183          //     for (i = 0; i < length; i++) {
+ 184          //      UART_TxByte(bytes[i]) ;
+ 185          //     }
+ 186          // }
+ 187          // #endif
+ 188          
+ 189          // #if (Enable_UART_Listen==1 )
+ 190          // void UART_listen() {
+ 191          //     unsigned char receivedData;
+ 192          
+ 193          //     // COMMAND LOGIC GOES HERE 
+ 194          
+ 195          //     if (RI) {
+ 196          //         receivedData = SBUF;  // Read the received character
+ 197          //         RI = 0;               // Clear the receive interrupt flag
+ 198          
+ 199          //         // Process the received data (mirror it back)
+ 200          //         SBUF = receivedData;  // Send the character back
+ 201          //         while (!TI);          // Wait for the transmit to complete
+ 202          //         TI = 0;               // Clear the transmit interrupt flag
+ 203          //     }
+ 204          // }
+ 205          // #endif
+ 206           
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    634    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      41
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,1 @@
+"..\..\..\libraries\i2c.c" BROWSE INCDIR(C:\Keil\C51\H) DEBUG OBJECTEXTEND PRINT(.\Listings\i2c.lst) TABS (2) OBJECT(.\Objects\i2c.obj)

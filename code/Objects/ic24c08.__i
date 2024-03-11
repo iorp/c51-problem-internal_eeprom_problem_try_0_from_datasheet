@@ -1,0 +1,1 @@
+"..\..\..\libraries\ic24c08.c" BROWSE INCDIR(C:\Keil\C51\H) DEBUG OBJECTEXTEND PRINT(.\Listings\ic24c08.lst) TABS (2) OBJECT(.\Objects\ic24c08.obj)

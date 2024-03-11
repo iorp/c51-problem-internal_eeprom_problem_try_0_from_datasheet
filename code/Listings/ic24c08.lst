@@ -1,0 +1,162 @@
+C51 COMPILER V9.52.0.0   IC24C08                                                           02/16/2024 09:58:09 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE IC24C08
+OBJECT MODULE PLACED IN .\Objects\ic24c08.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\..\libraries\ic24c08.c BROWSE INCDIR(C:\Keil\C51\H) DEBUG OBJECTEXTEN
+                    -D PRINT(.\Listings\ic24c08.lst) TABS(2) OBJECT(.\Objects\ic24c08.obj)
+
+line level    source
+
+   1          #include <stc12.h> 
+   2          #include "i2c.h"
+   3          #include "ic24c08.h"
+   4          
+   5          
+   6          // Function Purpose: IC24C08_writeByte writes a single byte on given address
+   7          // Address can have any value fromm 0 to 0x1FFF, and DataByte can have a value of 0 to 0xFF.
+   8          void IC24C08_writeByte(unsigned char Address, unsigned char DataByte){
+   9   1        I2C_start();                    // Start i2c communication
+  10   1      
+  11   1        // Send i2c address of 24C08 with write command
+  12   1        while(I2C_writeByte(Device_Address_24C08_EEPROM + 0) == 1)// Wait until device is free
+  13   1        { I2C_start();  }   
+  14   1      
+  15   1        //I2C_writeByte(Address>>8);              // Write Address upper byte
+  16   1        I2C_writeByte((unsigned char)Address);        // Write Address lower byte
+  17   1        I2C_writeByte(DataByte);              // Write data byte
+  18   1        I2C_stop();                     // Stop i2c communication
+  19   1      }
+  20          
+  21          // Function Purpose: IC24C08_readByte reads a single byte from given address
+  22          // Address can have any value fromm 0 to 0x1FFF.
+  23          unsigned char IC24C08_readByte(unsigned char Address){
+  24   1        unsigned char Byte = 0;               // Variable to store Received byte
+  25   1      
+  26   1        I2C_start();                    // Start i2c communication
+  27   1      
+  28   1        // Send i2c address of 24C08 with write command
+  29   1        while(I2C_writeByte(Device_Address_24C08_EEPROM + 0) == 1)// Wait until device is free
+  30   1        { I2C_start();  }   
+  31   1      
+  32   1      //  I2C_writeByte(Address>>8);              // Write Address upper byte
+  33   1        I2C_writeByte((unsigned char)Address);        // Write Address lower byte
+  34   1        I2C_reStart();                    // Restart i2c
+  35   1      
+  36   1        // Send i2c address of 24C08 EEPROM with read command 
+  37   1        I2C_writeByte(Device_Address_24C08_EEPROM + 1);   
+  38   1      
+  39   1        Byte = I2C_readByte();                // Read byte from EEPROM
+  40   1      
+  41   1        // Make SCK low, so that slave can stop driving SDA pin
+  42   1        // Send a NACK to indiacate single byte read is complete
+  43   1        I2C_sendNACK();
+  44   1      
+  45   1        // Send start bit and then stop bit to stop transmission
+  46   1        SDA = 0;        // Make SDA Low
+  47   1        I2C_delay(HalfBitDelay);  // Half bit delay
+  48   1        SDA = 1;        // Make SDA high
+  49   1        I2C_delay(HalfBitDelay);  // Half bit delay
+  50   1      
+  51   1        return Byte;        // Return the byte received from 24C08 EEPROM
+  52   1      }
+  53          
+  54          
+C51 COMPILER V9.52.0.0   IC24C08                                                           02/16/2024 09:58:09 PAGE 2   
+
+  55            //  UART_printf("%x,\f", (unsigned char)(wordToWrite & 0xFF));
+  56          void IC24C08_writeWord(unsigned char addr, unsigned int wordToWrite) {
+  57   1          IC24C08_writeByte(addr, (unsigned char)(wordToWrite & 0xFF));  // Write the low byte of the word  
+  58   1          IC24C08_writeByte(addr + 1, (unsigned char)(wordToWrite >> 8));  // Write the high byte of the word to
+             - the next address
+  59   1      }
+  60          
+  61          unsigned int IC24C08_readWord(unsigned char addr) {
+  62   1          unsigned char lowByte = IC24C08_readByte(addr);  // Read the low byte from the specified address
+  63   1          unsigned char highByte = IC24C08_readByte(addr + 1);  // Read the high byte from the next address
+  64   1      
+  65   1          return ((unsigned int)highByte << 8) | (unsigned int)lowByte;  // Combine the bytes to form the word
+  66   1      }
+  67          
+  68          
+  69          
+  70          /*
+  71          Working but not used 
+  72          // Function Purpose: IC24C08_writeBytes writes a page on given address
+  73          // Address can have value 0, 32, 64, .... only and pData is pointer to the array
+  74          // containing NoOfBytes bytes in it. NoOfBytes can have a value from 1 to 32 only.
+  75          void IC24C08_writeBytes(unsigned char Address,unsigned char* pData,unsigned char NoOfBytes)
+  76          {
+  77            unsigned int i;
+  78          
+  79            I2C_start();                    // Start i2c communication
+  80          
+  81            // Send i2c address of 24C08 with write command
+  82            while(I2C_writeByte(Device_Address_24C08_EEPROM + 0) == 1)// Wait until device is free
+  83            { I2C_start();  } 
+  84          
+  85            //I2C_writeByte(Address>>8);              // Write Address upper byte
+  86            I2C_writeByte((unsigned char)Address);        // Write Address lower byte
+  87          
+  88            for(i=0;i<NoOfBytes;i++)              // Write NoOfBytes
+  89              I2C_writeByte(pData[i]);            // Write data byte
+  90          
+  91            I2C_stop();                     // Stop i2c communication
+  92          }
+  93          
+  94          // Function Purpose: IC24C08_readBytes reads a NoOfBytes bytes from given starting address.
+  95          // Address can have any value fromm 0 to 0x1FFF. Also, NoOfBytes can have any value 0 to 0x1FFF.
+  96          // Read bytes are returned in pData array.
+  97          void IC24C08_readBytes(unsigned char Address, unsigned char* pData, unsigned int NoOfBytes)
+  98          {
+  99            unsigned int i;
+ 100          
+ 101            I2C_start();                    // Start i2c communication
+ 102          
+ 103            // Send i2c address of 24C08 with write command
+ 104            while(I2C_writeByte(Device_Address_24C08_EEPROM + 0) == 1)// Wait until device is free
+ 105            { I2C_start();  }   
+ 106          
+ 107            //I2C_writeByte(Address>>8);              // Write Address upper byte
+ 108            I2C_writeByte((unsigned char)Address);        // Write Address lower byte
+ 109            I2C_reStart();                    // Restart i2c
+ 110          
+ 111            // Send i2c address of 24C08 EEPROM with read command 
+ 112            I2C_writeByte(Device_Address_24C08_EEPROM + 1);   
+ 113          
+ 114            pData[0] = I2C_readByte();              // Read First byte from EEPROM
+ 115          
+C51 COMPILER V9.52.0.0   IC24C08                                                           02/16/2024 09:58:09 PAGE 3   
+
+ 116            for(i=1;i<NoOfBytes;i++)              // Read NoOfBytes
+ 117            {   
+ 118              I2C_sendACK();          // Give Ack to slave to start receiving next byte
+ 119              pData[i] = I2C_readByte();    // Read next byte from EEPROM
+ 120            }
+ 121          
+ 122            // Make SCK low, so that slave can stop driving SDA pin
+ 123            // Send a NACK to indiacate read operation is complete
+ 124            I2C_sendNACK();
+ 125          
+ 126            // Send start bit and then stop bit to stop transmission
+ 127            SDA = 0;        // Make SDA Low
+ 128            I2C_delay(HalfBitDelay);  // Half bit delay
+ 129            SDA = 1;        // Make SDA high
+ 130            I2C_delay(HalfBitDelay);  // Half bit delay
+ 131          }
+ 132          
+ 133          */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    131    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       9
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
